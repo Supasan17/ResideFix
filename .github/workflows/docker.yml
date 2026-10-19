@@ -1,0 +1,56 @@
+# Docker build check: makes sure both images build and the API container
+# starts and answers its health check. Images are built, not pushed.
+name: Docker build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Validate docker-compose.yml
+        run: docker compose config --quiet
+
+      - name: Build server image
+        uses: docker/build-push-action@v6
+        with:
+          context: residefix-server
+          push: false
+          load: true
+          tags: residefix-server:ci
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,mode=max,scope=server
+
+      - name: Build client image
+        uses: docker/build-push-action@v6
+        with:
+          context: residefix-client
+          push: false
+          load: true
+          tags: residefix-client:ci
+          cache-from: type=gha,scope=client
+          cache-to: type=gha,mode=max,scope=client
+
+      - name: Smoke test the full stack
+        run: |
+          docker compose up -d --build
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:5000/api/health; then echo; break; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:5000/api/health | grep '"database":"connected"'
+          curl -fsS http://localhost:8080/ | grep -q '<div id="root">'
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v

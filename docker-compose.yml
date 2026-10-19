@@ -1,0 +1,48 @@
+# Runs the full ResideFix stack: MongoDB + API + web client.
+#   docker compose up --build
+# Client: http://localhost:8080   API: http://localhost:5000/api/health
+# Seed sample data: docker compose exec server node src/scripts/seed.js
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build: ./residefix-server
+    restart: unless-stopped
+    ports:
+      - '5000:5000'
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGO_URI: mongodb://mongo:27017/residefix
+      # Override these in a .env file next to this compose file for anything non-local.
+      JWT_SECRET: ${JWT_SECRET:-docker-local-secret-change-me}
+      MANAGER_SIGNUP_CODE: ${MANAGER_SIGNUP_CODE:-residefix-manager}
+      CLIENT_ORIGIN: http://localhost:8080,http://localhost:5173
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  client:
+    build:
+      context: ./residefix-client
+      args:
+        # The browser calls the API directly, so this is the host-visible address.
+        VITE_API_URL: http://localhost:5000/api
+    restart: unless-stopped
+    ports:
+      - '8080:80'
+    depends_on:
+      - server
+
+volumes:
+  mongo-data:
