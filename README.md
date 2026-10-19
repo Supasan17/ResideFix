@@ -163,6 +163,8 @@ docker compose exec server node src/scripts/seed.js   # optional sample data
 | API | http://localhost:5000/api |
 | MongoDB | internal only (`mongo:27017`) |
 
+To deploy on an Ubuntu machine so other computers on the network can use it, follow [docs/DEPLOY_UBUNTU.md](docs/DEPLOY_UBUNTU.md).
+
 Stop with `docker compose down` (add `-v` to also delete the database volume). For anything beyond local use, put `JWT_SECRET=...` and `MANAGER_SIGNUP_CODE=...` in a `.env` file next to `docker-compose.yml`.
 
 ## Environment variables
